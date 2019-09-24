@@ -10,7 +10,7 @@ var connection = mysql.createConnection({
 });
 
 connection.connect(function(err) {
-    if (err) return callback(err);
+    if (err) throw err;
 
 });
 function AuthUser(userID, verificationCode, callback){
@@ -19,7 +19,7 @@ function AuthUser(userID, verificationCode, callback){
         var sql = "INSERT INTO main (UserID, verificationCode) VALUES ('"+userID+"', '"+verificationCode+"')";
         connection.query(sql, function (err, result) {
             //if number exists use where statement to instet into
-            console.log(result,"hey")
+            
             if (err.errno===1062) {
                 connection.query("UPDATE main SET verificationCode = '"+verificationCode+"' WHERE UserID = '"+userID+"'", function (err, result) {
                     if(err)return callback(err);
@@ -148,6 +148,10 @@ function sendMessage(UserId, to,message, time_received, timeSent,status,type,par
             return callback({success:false,which:1})
         }
     })
+}
+
+function sendMessage() {
+    
 }
 
 function genAccessToken(callback) {
