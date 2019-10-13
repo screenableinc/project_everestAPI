@@ -185,7 +185,7 @@ function sendMessage(text, message_id, chat_id, time_recieved, has_attachments, 
                     }else if(err){
                         return {success:false,msg:"here"}
                     }else{
-                    //    insert message into db without setting last message
+                    //    insert message into db without setting last message ok
                         var values = [message_id,text,time_recieved,status,type,sender,parent_message_id,media_duration,media_url,media_mime_type,chat_id,time_sent]
                         var query = "INSERT INTO messages (message_id, text, time_received, status, type, sender, parent_message_id, media_duration, media_url, media_mime_type, chat_id, recipient, time_sent) VALUES ?"
 
