@@ -2,7 +2,7 @@ var express = require('express');
 var router = express.Router();
 var databaseconnect = require('./databaseconnect')
 /* GET users listing. */
-router.get('/messages', function(req, res, next) {
+router.get('/messages/all', function(req, res, next) {
 
     var accessToken  = req.query.accessToken;
     var number = req.query.number;
@@ -24,6 +24,12 @@ router.get('/messages', function(req, res, next) {
 
   res.send('respond with a resource');
 });
+router.post('/messages/send', function (req, res, next) {
+
+
+
+
+})
 
 module.exports = router;
 

@@ -59,7 +59,7 @@ function verify(verificationCode,userID, callback) {
 function validate_user(userId, accessToken, callback) {
     var sql = "SELECT * FROM main WHERE UserID = '"+userId+"' AND accessToken ='"+ accessToken +"'";
     connection.query(sql, function(err,result) {
-        console.log(sql)
+        console.log(sql,"wise")
         if (err) {
             // TODO: handle error
             return callback({success: false})
@@ -106,53 +106,126 @@ function targetExistsCheck(targetParam, targetValue,targetTable, callback) {
     })
 }
 
-function sendMessage(UserId, to,message, time_received, timeSent,status,type,parentMessage, mediaDuration,media_url,thumbnail, message_id,callback) {
-    targetExistsCheck("UserID", UserId,"main", function (res) {
-        if(res.success){
-        //    move on to check recipients existence
-            targetExistsCheck("UserID",to,"main",function (res) {
-                if(res.success){
-
-                //    both exist, send message
-                //    chat id is a combination of userIds...create if it dont exist
-                    var chat_id = UserId+"_"+to
-                    var sql = "INSERT INTO chats (chat_id, last_message) VALUES ('"+chat_id+"', '"+message_id+"')";
-                    var message = "INSERT INTO chats (chat_id, message) VALUES ('"+chat_id+"', '"+message_id+"')";
-                    connection.query(sql, function (err, result) {
-                        //TODO figure out message id retrieval after auto-increamentq
-                        //if number exists use where statement to insert into
-                        if (err &&err.errno===1062) {
-                            connection.query("UPDATE chats SET last_message = '"+message_id+"' chat_id = '"+chat_id+"'", function (err, result) {
-                                if(err)return callback({success:false,error:err});
-
-                                return callback({success:true})
-                            })
-                        }else if(err){
-                            return {success:false}
-                        }else{
-                        //    insert message into db
-
-                        }
-
-
-                    });
-
-
-
-                }else {
-                    //return which one failed
-                    return callback({success:false, which:2})
-                }
-            })
+function sqlInsert(sql, callback) {
+    connection.query(sql,function (err, result) {
+        if(err){
+            return callback({success:false, src:"sqlInsert",msg:err})
         }else {
-            return callback({success:false,which:1})
+            return callback({success:true, src:"sqlInsert"})
+        }
+    })
+
+}
+function sqlMultipleInsert(sql, values, callback){
+    connection.query(sql, [[values]], function (err,result) {
+        if (err){
+
+            return callback({success:false, msg:err, src:"sqlMultipleInsert"})
+        }else {
+
+            return callback({success:true, msg:result})
         }
     })
 }
 
-function sendMessage() {
-    
+function sendMessage(text, message_id, chat_id, time_recieved, has_attachments, type, recipient_count, recipients, sender, time_sent, status, parent_message_id, media_duration, media_url, media_mime_type, callback) {
+    targetExistsCheck("UserID", sender,"main", function (res) {
+        if(res.success){
+        //    move on to check recipients existence
+        //     TODO:: Note, i am startng with 1-1 chat first
+            
+
+
+                //    both exist, send message
+                //    chat id is a combination of userIds...create if it dont exist
+                //TODO optimise for multiple recipients
+                var to =  JSON.parse(recipients)[0]
+                var chat_id = sender+"_"+to
+                var sql = "INSERT INTO chats (chat_id, last_message) VALUES ('"+chat_id+"', '"+message_id+"')";
+
+                connection.query(sql, function (err, result) {
+
+                    //if number exists use where statement to insert into
+                    var errorNo=0
+                    try {
+                        errorNo=err.errno
+                    }catch (e) {
+                        ""
+                    }
+
+                    if (errorNo===1062) {
+                        connection.query("UPDATE chats SET last_message = '"+message_id+"', chat_id = '"+chat_id+"'", function (err, result) {
+                            if(err)return callback({success:false,error:err});
+
+                            //insert_message
+                            var values = [text,time_recieved,status,type,sender,parent_message_id,media_duration,media_url,media_mime_type,chat_id,time_sent]
+                            var query = "INSERT INTO messages (text, time_received, status, type, sender, parent_message_id, media_duration, media_url, media_mime_type, chat_id, time_sent) VALUES ?"
+
+                            sqlMultipleInsert(query,values,function (res) {
+                                //great now add to the recipients table if success.. this is so owners of the message can check easily
+                                if (res.success){
+                                    var messageId = res.msg.insertId;
+
+                                    var sql = "INSERT INTO message_recipient (message_id, recipient_id) VALUES ('"+messageId+"', '"+to+"')";
+
+                                    sqlInsert(sql,function (res) {
+                                        if(res.success){
+                                            return callback(res)
+                                        }else {
+                                            return callback(res)
+                                        }
+                                    })
+                                }
+
+                            })
+
+
+
+                        })
+                    }else if(err){
+                        return {success:false,msg:"here"}
+                    }else{
+                    //    insert message into db without setting last message
+                        var values = [message_id,text,time_recieved,status,type,sender,parent_message_id,media_duration,media_url,media_mime_type,chat_id,time_sent]
+                        var query = "INSERT INTO messages (message_id, text, time_received, status, type, sender, parent_message_id, media_duration, media_url, media_mime_type, chat_id, recipient, time_sent) VALUES ?"
+
+                        sqlMultipleInsert(query,values,function (res) {
+                            if (res.success){
+                                var messageId = res.msg.insertId;
+
+                                var sql = "INSERT INTO message_recipient (message_id, recipient_id) VALUES ('"+messageId+"', '"+to+"')";
+
+                                sqlInsert(sql,function (res) {
+                                    if(res.success){
+                                        return callback(res)
+                                    }else {
+                                        return callback(res)
+                                    }
+                                })
+                            }else{
+                                return callback(res)
+                            }
+                        })
+
+                    }
+
+
+                });
+
+
+
+            }else {
+                //return which one failed
+                return callback({success:false, which:2})
+            }
+        })
+
+
 }
+
+// function sendMessage(text, message_id, chat_id, time_recieved, has_attachments, type, recipient_count, recipients, sender, time_sent, status, parent_message_id, media_duration, media_url, media_mime_type ) {
+//
+// }
 
 function genAccessToken(callback) {
     var text = "";
