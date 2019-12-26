@@ -19,9 +19,10 @@ router.post('/send', function (req, res,next) {
     var recipient_count=req.body.recipient_count;
     var recipients=req.body.recipients;
     var time_sent=req.body.time_sent;
+    console.log(req.body)
     databaseconnect.sendMessage(text,message_id,chat_id,time_received,has_attachments,type,recipient_count,recipients, sender,time_sent,status,parent_message_id,
         media_duration,media_url,media_mime_type,function (msg) {
-        console.log(req.body)
+
             res.send(msg)
         })
 

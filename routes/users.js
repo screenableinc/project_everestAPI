@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var databaseconnect = require('./databaseconnect')
+var request  = require('ajax-request')
 /* GET users listing. */
 router.get('/messages/all', function(req, res, next) {
 
@@ -24,12 +25,45 @@ router.get('/messages/all', function(req, res, next) {
 
   res.send('respond with a resource');
 });
+router.get('/search',function (req, res ,next) {
+    var qs = req.query.qs;
+    console.log(req.query)
+
+ // TODO:  remember to authenticate user
+    databaseconnect.liveSearch(qs,"main","UserID",function (msg) {
+        res.send(msg)
+    });
+
+
+})
 router.post('/messages/send', function (req, res, next) {
 
 
 
 
 })
+router.get('/genFake', function (req, res, next) {
+
+
+    var request = require('request');
+    request({ url: 'https://randomuser.me/api/?results=300&nat=us,fr,dk,au,ie,ir', qs: {
+        dataType:'json'
+    } }, async function (error, response, body) {
+    console.log('error:', error); // Print the error if one occurred
+    console.log('statusCode:', response && response.statusCode);
+    // Print the response status code if a response was received
+    var results = JSON.parse(body)["results"];
+        console.log('body:', results); // Print the HTTP body
+
+        var func = await databaseconnect.genFakeData(results)
+        res.send("done")
+});
+
+
+
+})
+
+
 
 module.exports = router;
 

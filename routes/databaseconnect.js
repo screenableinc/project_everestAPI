@@ -237,9 +237,53 @@ function genAccessToken(callback) {
     return callback(text);
 }
 
+//TODO:: remove this function on deploy
+
+
+async function genFakeData(list){
+    try {
+        console.log(list)
+        for (var i = 0; i < list.length ; i++) {
+            console.log("now here")
+            var fullname= list[i]["name"]["first"]+" "+list[i]["name"]["last"];
+            var id = list[i]["name"]["first"]+list[i]["name"]["last"]+"_"+i;
+            var profile_pic_url=list[i]["picture"]["thumbnail"];
+            var profile_pic_url_md=list[i]["picture"]["medium"];
+            var profile_pic_url_lg=list[i]["picture"]["large"];
+            var values=[id,fullname,profile_pic_url_md,profile_pic_url_lg,profile_pic_url]
+            var query = "INSERT INTO main (UserID, fullname, profile_picture_url_md, profile_picture_url_lg, profile_picture_url) VALUES ?"
+            var sql =await sqlMultipleInsert(query,values,function (cb) {
+                if(!cb.success){
+                    console.log(cb)
+                };
+
+            })
+            console.log("now loading "+i)
+
+        }
+    }catch (e) {
+        console.log("ooopsss!!! : "+e)
+    }
+}
+function liveSearch(qs,table,param,callback){
+    var sql = "SELECT * from "+table+" WHERE "+param+" LIKE '%"+qs+"%'"
+    var sql2="SELECT * from main where UserID LIKE '${qs}%'"
+    console.log(qs)
+    connection.query(sql,function (err,result) {
+        if(err){
+            return callback({success:false,msg:err})
+        }else {
+            callback({success:true,data:result})
+        }
+    })
+
+}
+
 module.exports = {
     AuthUser:AuthUser,
     verify:verify,
     getAllMessages:getAllMessages,
-    sendMessage:sendMessage
+    sendMessage:sendMessage,
+    genFakeData:genFakeData,
+    liveSearch:liveSearch
 }
