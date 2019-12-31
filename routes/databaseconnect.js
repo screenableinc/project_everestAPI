@@ -1,5 +1,6 @@
 var mysql = require("mysql");
-
+var misc = require("./misc")
+var async =require("async")
 
 var connection = mysql.createConnection({
     host     : 'localhost',
@@ -127,6 +128,13 @@ function sqlMultipleInsert(sql, values, callback){
         }
     })
 }
+function addConnection(following,follwedby,callback) {
+//    TODO add filter to check if users are already connected
+    var query = "INSERT INTO connections (following, followedby) VALUES ('"+following+"', '"+follwedby+"')";
+    sqlInsert(query,function (msg) {
+        return callback(msg)
+    })
+}
 
 function sendMessage(text, message_id, chat_id, time_recieved, has_attachments, type, recipient_count, recipients, sender, time_sent, status, parent_message_id, media_duration, media_url, media_mime_type, callback) {
     targetExistsCheck("UserID", sender,"main", function (res) {
@@ -222,6 +230,16 @@ function sendMessage(text, message_id, chat_id, time_recieved, has_attachments, 
 
 
 }
+function selectAll(from,column,target,callback) {
+    var sql = "SELECT * FROM "+ from+" WHERE "+column+" = '"+target+"'";
+    connection.query(sql,function (err,result) {
+        if(err){
+            return callback({success:false,data:err})
+        }else {
+            return callback({success:true,data:result})
+        }
+    })
+}
 
 // function sendMessage(text, message_id, chat_id, time_recieved, has_attachments, type, recipient_count, recipients, sender, time_sent, status, parent_message_id, media_duration, media_url, media_mime_type ) {
 //
@@ -240,35 +258,92 @@ function genAccessToken(callback) {
 //TODO:: remove this function on deploy
 
 
-async function genFakeData(list){
-    try {
-        console.log(list)
-        for (var i = 0; i < list.length ; i++) {
-            console.log("now here")
-            var fullname= list[i]["name"]["first"]+" "+list[i]["name"]["last"];
-            var id = list[i]["name"]["first"]+list[i]["name"]["last"]+"_"+i;
-            var profile_pic_url=list[i]["picture"]["thumbnail"];
-            var profile_pic_url_md=list[i]["picture"]["medium"];
-            var profile_pic_url_lg=list[i]["picture"]["large"];
-            var values=[id,fullname,profile_pic_url_md,profile_pic_url_lg,profile_pic_url]
+function genFakeData(list){
+    console.log(list.length)
+    function recurse(i) {
+
+        if (i < list.length) {
+            var fullname = list[i]["name"]["first"] + " " + list[i]["name"]["last"];
+            var id = list[i]["name"]["first"] + list[i]["name"]["last"] + "_" + i;
+            var profile_pic_url = list[i]["picture"]["thumbnail"];
+            var profile_pic_url_md = list[i]["picture"]["medium"];
+            var profile_pic_url_lg = list[i]["picture"]["large"];
+            var values = [id, fullname, profile_pic_url_md, profile_pic_url_lg, profile_pic_url]
             var query = "INSERT INTO main (UserID, fullname, profile_picture_url_md, profile_picture_url_lg, profile_picture_url) VALUES ?"
-            var sql =await sqlMultipleInsert(query,values,function (cb) {
-                if(!cb.success){
-                    console.log(cb)
-                };
+            console.log(fullname)
+            var sql = sqlMultipleInsert(query, values, function (cb) {
+                function innerRecurse(j){
+                    if(j<15){
+
+                                                //use media high column for soring test urls
+                        var randompic="http://www.screenableinc.com/everest/"+Math.floor(Math.random() * 595)+".jpg"
+                        var inQ = "INSERT INTO canvas (ownerID, postID, media_url_high, timestamp, type) VALUES ?"
+                        var token=misc.genRandToken(15,function (callback) {
+                            return callback;
+                        })
+                        var values=[id,token,randompic,new Date().getTime()+"",1]
+                        console.log(i)
+                         sqlMultipleInsert(inQ,values, function (cb) {
+                            innerRecurse(j+1)
+                        })
+
+                    }else {
+                        recurse(i+1)
+                    }
+                }
+                innerRecurse(0)
+                // recurse(i+1)
 
             })
-            console.log("now loading "+i)
-
         }
-    }catch (e) {
-        console.log("ooopsss!!! : "+e)
+
     }
+    recurse(0)
+       // for (var i = 0; i < list.length; i++) {
+       //
+       //     console.log(fullname)
+       // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
 function liveSearch(qs,table,param,callback){
     var sql = "SELECT * from "+table+" WHERE "+param+" LIKE '%"+qs+"%'"
-    var sql2="SELECT * from main where UserID LIKE '${qs}%'"
-    console.log(qs)
+
+
     connection.query(sql,function (err,result) {
         if(err){
             return callback({success:false,msg:err})
@@ -282,6 +357,8 @@ function liveSearch(qs,table,param,callback){
 module.exports = {
     AuthUser:AuthUser,
     verify:verify,
+    selectAll:selectAll,
+    addConnection:addConnection,
     getAllMessages:getAllMessages,
     sendMessage:sendMessage,
     genFakeData:genFakeData,

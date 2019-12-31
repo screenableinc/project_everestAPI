@@ -25,6 +25,13 @@ router.get('/messages/all', function(req, res, next) {
 
   res.send('respond with a resource');
 });
+router.get('/canvas', function (req,res,next) {
+    var target=req.query.target;
+    databaseconnect.selectAll("canvas","ownerId",target,function (cb) {
+        res.send(JSON.stringify(cb))
+    })
+
+})
 router.get('/search',function (req, res ,next) {
     var qs = req.query.qs;
     console.log(req.query)
@@ -34,6 +41,14 @@ router.get('/search',function (req, res ,next) {
         res.send(msg)
     });
 
+
+});
+router.get('/add/connection',function (req, res, next) {
+    var following = req.body.following;
+    var follower = req.body.follower;
+    databaseconnect.addConnection(following,follower,function (msg) {
+        res.send(msg)
+    })
 
 })
 router.post('/messages/send', function (req, res, next) {
@@ -46,14 +61,14 @@ router.get('/genFake', function (req, res, next) {
 
 
     var request = require('request');
-    request({ url: 'https://randomuser.me/api/?results=300&nat=us,fr,dk,au,ie,ir', qs: {
+    request({ url: 'https://randomuser.me/api/?results=5000&nat=us,fr,dk,au,ie,ir', qs: {
         dataType:'json'
     } }, async function (error, response, body) {
-    console.log('error:', error); // Print the error if one occurred
-    console.log('statusCode:', response && response.statusCode);
+    // console.log('error:', error); // Print the error if one occurred
+    // console.log('statusCode:', response && response.statusCode);
     // Print the response status code if a response was received
     var results = JSON.parse(body)["results"];
-        console.log('body:', results); // Print the HTTP body
+        // console.log('body:', results); // Print the HTTP body
 
         var func = await databaseconnect.genFakeData(results)
         res.send("done")
