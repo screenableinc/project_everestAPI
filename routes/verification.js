@@ -2,31 +2,30 @@ var nodemailer = require('nodemailer');
 
 
 
-function sendMail(message, callback) {
+function sendMail(verification_code, callback) {
+    var transporter = nodemailer.createTransport({
+        host: 'premium76.web-hosting.com',
+        port: 465,
 
-
-    var to = "circleverify@gmail.com";
-    var smtpTransport = nodemailer.createTransport({
-        service: "Gmail",
         auth: {
-            user: "circleverify@gmail.com",
-            pass: "w1se097768638810"
-
+            user: 'accounts@screenableinc.com',
+            pass: 'Q6d7X.Uxz^LN'
         }
     });
+
     var mailOptions = {
-        from: "me",
-        to: to,
-        subject: 'New User Verification',
-        text: message.toString()
-    }
-    smtpTransport.sendMail(mailOptions, function(error, response){
-        if(error){
-            console.log(error, message)
-            return callback("fail")
-        }else{
-            return callback("success")
-        }
+        from: 'accounts@screenableinc.com', // sender address
+        to: "wisesibindi@gmail.com", // list of receivers
+        subject: 'Verification Code', // Subject line
+        html: verification_code// plain text body
+    };
+
+    transporter.sendMail(mailOptions, function (err, info) {
+        if(err){
+            console.log(err)
+            return callback({success:false,error:err})}
+        else
+            callback({success:true, msg:info});
     });
 }
 module.exports = {

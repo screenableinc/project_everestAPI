@@ -13,13 +13,13 @@ router.post('/join', function(req, res, next) {
     var vcode = req.body.verificationCode;
 
     join(number,vcode,function (r,e) {
-        if(r==="success"){
+        if(r.success){
 
             // send json
             res.send(JSON.stringify({code:1,data:"success",type:"string",dimensions:1}))
         }else {
             // send failure json
-            res.send(JSON.stringify({code:0,data:"fail",type:"string",dimensions:1}))
+            res.send(JSON.stringify({code:0,data:r.res,type:"string",dimensions:1}))
         }
     })
 
@@ -27,10 +27,43 @@ router.post('/join', function(req, res, next) {
   //     console.log(back)
   // })
 });
+router.post('/finalize',function (req, res, next) {
+    // TODO:: add provision for if image uploaded
+    var fullname=req.body.fullname;
+    var username=req.body.username;
+    var userID = req.body.UserID;
+    console.log(req.body)
+
+    databaseConnect.targetExistsCheck("username",username,"main",function (msg) {
+        if(!msg.success && msg.code===10822){
+        //    go ahead and store remember to change after adding fprofile selection
+            var sql = "UPDATE main SET username=?, fullname=? WHERE UserID=?";
+            databaseConnect.finalizeSetup(sql,[username,fullname,userID],function (msgInner) {
+                if(msgInner.success) {
+                    res.send(JSON.stringify({success: true, code: 200}))
+                }else {
+                    console.log(msgInner)
+                    res.send(JSON.stringify({success: false, code:500}))
+                }
+            })
+        }else if(msg.success){
+            // username exists
+            res.send(JSON.stringify({success:false,code:201}))
+        }else if(!msg.success && msg.code ===10222){
+        //    error occurred
+            console.log(msg)
+            res.send(JSON.stringify({success:false,code:500}))
+        }
+    })
+
+
+})
 router.post('/verify',function (req, res, next) {
 
     var vcode = req.body.verificationCode
     var number = req.body.number
+    console.log(req.body)
+
     databaseConnect.verify(vcode, number,function (r) {
        if(r.length===15){
        //    a length of 15 means its a valid key
@@ -57,11 +90,11 @@ router.post('/verify',function (req, res, next) {
 
 function sendMail(verification_code,callback) {
     verification.sendMail(verification_code,function (sendMailStatus) {
-        if (sendMailStatus==="success"){
-            return callback("success")
+        if (sendMailStatus.success){
+            return callback(sendMailStatus)
         }else {
             console.log("fail area 15")
-            return callback("fail")
+            return callback(sendMailStatus)
         }
 
 
@@ -75,21 +108,20 @@ function join(number, verification_code, callback) {
 
     databaseConnect.AuthUser(number,verification_code,function (res) {
 
-        if(res==="success"){
+        if(res.success){
         //    send verification code to user if accepted into database
             sendMail(verification_code+", "+number,function (sendMailStatus) {
-                if(sendMailStatus==="success"){
-                    return callback("success")
+                if(sendMailStatus.success){
+                    return callback(sendMailStatus)
                 }else {
                     console.log("fail area 12")
-                    return callback("fail")
+                    return callback(sendMailStatus)
                 }
             })
 
         }else {
-            console.log("no")
-            console.log("fail area 13")
-            callback("fail")
+            
+            callback(res)
         }
     })
 
@@ -97,4 +129,15 @@ function join(number, verification_code, callback) {
 
 }
 
-module.exports = router;
+module.exports = function (io){
+    io.on('connection',function (socket) {
+        var chat_id = socket.handshake.query.chat_id;
+        console.log(chat_id)
+        socket.on(chat_id,function (content) {
+        //    save to database and emit the event to recipient
+            socket.emit(content.recipient,content)
+
+        })
+    })
+    return router;
+};

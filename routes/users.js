@@ -2,6 +2,8 @@ var express = require('express');
 var router = express.Router();
 var databaseconnect = require('./databaseconnect')
 var request  = require('ajax-request')
+
+
 /* GET users listing. */
 router.get('/messages/all', function(req, res, next) {
 
@@ -27,9 +29,21 @@ router.get('/messages/all', function(req, res, next) {
 });
 router.get('/canvas', function (req,res,next) {
     var target=req.query.target;
-    databaseconnect.selectAll("canvas","ownerId",target,function (cb) {
-        res.send(JSON.stringify(cb))
+    //todo ::make this code simpler there must be a way to query once via foreign key
+    //resolve to get username
+    databaseconnect.selectAll("main","UserID",target,function (cb) {
+        if(cb.success){
+            var userdata=cb.data[0]
+            databaseconnect.selectAll("canvas","ownerId",userdata["username"],function (cb) {
+                if(cb.success){
+                    res.send({success:true,code:200,userdata:userdata,canvasdata:cb.data})
+                }else {res.send({success: false,code: 500})}
+            })
+        }else {
+            console.log(cb)
+            res.send({success: false,code: 500})}
     })
+
 
 })
 router.get('/search',function (req, res ,next) {
@@ -43,9 +57,30 @@ router.get('/search',function (req, res ,next) {
 
 
 });
+router.get('/connections/all',function (req, res, next) {
+//    TODO::filter to add whrer clause
+    var connectionType = req.query.connectionType;
+    var target = req.query.target;
+    databaseconnect.getAllConnections(connectionType,target,function (msg) {
+        res.send(JSON.stringify(msg))
+    })
+})
 router.get('/add/connection',function (req, res, next) {
-    var following = req.body.following;
-    var follower = req.body.follower;
+    var following = req.query.following;
+    var follower = req.query.follower;
+    databaseconnect.targetExistsCheck("follower",follower,"connections",function (follwermsg) {
+        if(follwermsg.code===10822){
+        //    foller exists..check following
+            databaseconnect.targetExistsCheck("following",following,"connections",function (followingMsg) {
+                if(followingMsg.code===10822){
+                    // following exists
+                    databaseconnect.addConnection(following,follower,function (msg) {
+                        res.send(msg)
+                    })
+                }
+            })
+        }
+    })
     databaseconnect.addConnection(following,follower,function (msg) {
         res.send(msg)
     })

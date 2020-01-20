@@ -16,19 +16,24 @@ connection.connect(function(err) {
 });
 function AuthUser(userID, verificationCode, callback){
 
-
+        // TODO add separate transitioning table to avoid users seasrchin or sending messages to accounts that havent been verified yet
         var sql = "INSERT INTO main (UserID, verificationCode) VALUES ('"+userID+"', '"+verificationCode+"')";
         connection.query(sql, function (err, result) {
             //if number exists use where statement to instet into
-            
-            if (err.errno===1062) {
+            if(err){
+                return callback({success:false, res:err})
+            }else if (err && err.errno===1062) {
                 connection.query("UPDATE main SET verificationCode = '"+verificationCode+"' WHERE UserID = '"+userID+"'", function (err, result) {
-                    if(err)return callback(err);
-                    console.log(result)
-                    return("success","whoa")
+                    if(err) {
+                        return callback({success: false, res: err});
+                    }
+                    else {
+                        return callback({success:true,res:result})
+                    }
                 })
-            };
-            return callback("success");
+            }else {
+                return callback({success:true,res:result});
+            }
         });
 
 }
@@ -37,7 +42,11 @@ function verify(verificationCode,userID, callback) {
     console.log(userID, verificationCode)
     var sql = "SELECT * FROM main WHERE UserID = '"+userID+"'";
     connection.query(sql, function (err, result, fields) {
-        if(result[0].verificationCode===verificationCode){
+        console.log(result)
+        if(err || result.length===0){
+            console.log(result)
+            return callback({success:false,response:err})
+        }else if(result[0].verificationCode===verificationCode){
         //    gen access token and save to database
             genAccessToken(function (text) {
                var query = "UPDATE main SET accessToken = '"+text+"' WHERE UserID = '"+userID+"'"
@@ -96,12 +105,12 @@ function targetExistsCheck(targetParam, targetValue,targetTable, callback) {
     var sql = "SELECT * FROM "+targetTable+" WHERE "+ targetParam+" = '"+targetValue+"'";
     connection.query(sql,function (err, result) {
         if (err){
-            return callback({success:false,data:err.errno,from:sql})
+            return callback({success:false,data:err.errno,from:sql,code:10222})
         }else {
             if (result.length===0){
-                return callback({success: false,data:"doesn't exist"})
+                return callback({success: false,data:"doesn't exist",code:10822})
             }else {
-                return callback({success: true})
+                return callback({success: true,code:10001})
             }
         }
     })
@@ -117,6 +126,16 @@ function sqlInsert(sql, callback) {
     })
 
 }
+function finalizeSetup(sql,values,callback) {
+    connection.query(sql,values,function (err,result) {
+        if(err){
+            return callback({success:false,msg:err})
+        }else {
+            return callback({success:true,msg:result})
+        }
+    })
+}
+
 function sqlMultipleInsert(sql, values, callback){
     connection.query(sql, [[values]], function (err,result) {
         if (err){
@@ -136,7 +155,7 @@ function addConnection(following,follwedby,callback) {
     })
 }
 
-function sendMessage(text, message_id, chat_id, time_recieved, has_attachments, type, recipient_count, recipients, sender, time_sent, status, parent_message_id, media_duration, media_url, media_mime_type, callback) {
+function sendMessage(text, message_id, chat_id, has_attachments, type, sender, time_sent, status, parent_message_id, media_duration, media_url, media_mime_type,reciever, callback) {
     targetExistsCheck("UserID", sender,"main", function (res) {
         if(res.success){
         //    move on to check recipients existence
@@ -147,8 +166,10 @@ function sendMessage(text, message_id, chat_id, time_recieved, has_attachments, 
                 //    both exist, send message
                 //    chat id is a combination of userIds...create if it dont exist
                 //TODO optimise for multiple recipients
-                var to =  JSON.parse(recipients)[0]
-                var chat_id = sender+"_"+to
+                var to =  reciever
+                //sort chat id to make sure order is the same
+                // var chat_id = [sender,to].sort();
+                // chat_id=chat_id[0]+"_"+chat_id[1]
                 var sql = "INSERT INTO chats (chat_id, last_message) VALUES ('"+chat_id+"', '"+message_id+"')";
 
                 connection.query(sql, function (err, result) {
@@ -166,11 +187,12 @@ function sendMessage(text, message_id, chat_id, time_recieved, has_attachments, 
                             if(err)return callback({success:false,error:err});
 
                             //insert_message
-                            var values = [text,time_recieved,status,type,sender,parent_message_id,media_duration,media_url,media_mime_type,chat_id,time_sent]
-                            var query = "INSERT INTO messages (text, time_received, status, type, sender, parent_message_id, media_duration, media_url, media_mime_type, chat_id, time_sent) VALUES ?"
+                            var values = [text,status,type,sender,parent_message_id,media_duration,media_url,media_mime_type,chat_id,time_sent]
+                            var query = "INSERT INTO messages (text, status, type, sender, parent_message_id, media_duration, media_url, media_mime_type, chat_id, time_sent) VALUES ?"
 
                             sqlMultipleInsert(query,values,function (res) {
                                 //great now add to the recipients table if success.. this is so owners of the message can check easily
+
                                 if (res.success){
                                     var messageId = res.msg.insertId;
 
@@ -255,7 +277,6 @@ function genAccessToken(callback) {
     return callback(text);
 }
 
-//TODO:: remove this function on deploy
 
 
 function genFakeData(list){
@@ -264,24 +285,26 @@ function genFakeData(list){
 
         if (i < list.length) {
             var fullname = list[i]["name"]["first"] + " " + list[i]["name"]["last"];
-            var id = list[i]["name"]["first"] + list[i]["name"]["last"] + "_" + i;
+            var username = list[i]["name"]["first"] + list[i]["name"]["last"] + "_" + i;
             var profile_pic_url = list[i]["picture"]["thumbnail"];
             var profile_pic_url_md = list[i]["picture"]["medium"];
             var profile_pic_url_lg = list[i]["picture"]["large"];
-            var values = [id, fullname, profile_pic_url_md, profile_pic_url_lg, profile_pic_url]
-            var query = "INSERT INTO main (UserID, fullname, profile_picture_url_md, profile_picture_url_lg, profile_picture_url) VALUES ?"
+            var values = [JSON.stringify(i), fullname, profile_pic_url_md, profile_pic_url_lg, profile_pic_url,username]
+            var query = "INSERT INTO main (UserID, fullname, profile_picture_url_md, profile_picture_url_lg, profile_picture_url,username) VALUES ?"
             console.log(fullname)
             var sql = sqlMultipleInsert(query, values, function (cb) {
                 function innerRecurse(j){
                     if(j<15){
 
                                                 //use media high column for soring test urls
-                        var randompic="http://www.screenableinc.com/everest/"+Math.floor(Math.random() * 595)+".jpg"
-                        var inQ = "INSERT INTO canvas (ownerID, postID, media_url_high, timestamp, type) VALUES ?"
-                        var token=misc.genRandToken(15,function (callback) {
+                        var randompicname=Math.floor(Math.random() * 595)
+                        var randompic="http://www.screenableinc.com/everest/"+randompicname+".jpg"
+                        var randompic_med="http://www.screenableinc.com/everest/thumbnails/tn_"+randompicname+".jpg"
+                        var inQ = "INSERT INTO canvas (ownerID, postID, media_url_high, media_url_med, timestamp, type) VALUES ?"
+                        var token=misc.genRandToken(30,function (callback) {
                             return callback;
                         })
-                        var values=[id,token,randompic,new Date().getTime()+"",1]
+                        var values=[username,token,randompic,randompic_med,new Date().getTime()+"",1]
                         console.log(i)
                          sqlMultipleInsert(inQ,values, function (cb) {
                             innerRecurse(j+1)
@@ -341,7 +364,7 @@ function genFakeData(list){
 
 }
 function liveSearch(qs,table,param,callback){
-    var sql = "SELECT * from "+table+" WHERE "+param+" LIKE '%"+qs+"%'"
+    var sql = "SELECT * from "+table+" WHERE "+param+" LIKE '%"+qs+"%' OR username LIKE '%"+qs+"%'"
 
 
     connection.query(sql,function (err,result) {
@@ -353,6 +376,16 @@ function liveSearch(qs,table,param,callback){
     })
 
 }
+function getAllConnections(column,where, callback){
+    var query = "SELECT * FROM connections WHERE "+column+" = '"+where+"'";
+    connection.query(query,function (err,result) {
+        if(err){
+            return callback({success:false, code:500,data:err})
+        }else {
+            return callback({success:true, code:200,data:result})
+        }
+    })
+}
 
 module.exports = {
     AuthUser:AuthUser,
@@ -362,5 +395,8 @@ module.exports = {
     getAllMessages:getAllMessages,
     sendMessage:sendMessage,
     genFakeData:genFakeData,
-    liveSearch:liveSearch
+    liveSearch:liveSearch,
+    targetExistsCheck:targetExistsCheck,
+    getAllConnections:getAllConnections,
+    finalizeSetup:finalizeSetup
 }
