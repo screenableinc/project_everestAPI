@@ -132,7 +132,7 @@ function join(number, verification_code, callback) {
 module.exports = function (io){
     io.on('connection',function (socket) {
         var chat_id = socket.handshake.query.chat_id;
-        console.log(chat_id)
+
         socket.on(chat_id,function (content) {
         //    save to database and emit the event to recipient
             socket.emit(content.recipient,content)

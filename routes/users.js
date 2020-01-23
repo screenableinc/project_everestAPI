@@ -30,11 +30,15 @@ router.get('/messages/all', function(req, res, next) {
 router.get('/canvas', function (req,res,next) {
     var target=req.query.target;
     //todo ::make this code simpler there must be a way to query once via foreign key
+    console.log("here")
     //resolve to get username
     databaseconnect.selectAll("main","UserID",target,function (cb) {
+
         if(cb.success){
             var userdata=cb.data[0]
+
             databaseconnect.selectAll("canvas","ownerId",userdata["username"],function (cb) {
+
                 if(cb.success){
                     res.send({success:true,code:200,userdata:userdata,canvasdata:cb.data})
                 }else {res.send({success: false,code: 500})}

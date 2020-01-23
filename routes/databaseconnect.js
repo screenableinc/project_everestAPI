@@ -2,18 +2,19 @@ var mysql = require("mysql");
 var misc = require("./misc")
 var async =require("async")
 
-var connection = mysql.createConnection({
+var connection = mysql.createPool({
+    connectionLimit:0,
     host     : 'localhost',
     user     : 'root',
     password : 'w1se097768638810',
     database: "everest"
 
 });
-
-connection.connect(function(err) {
-    if (err) throw err;
-
-});
+//
+// connection.connect(function(err) {
+//     if (err) throw err;
+//
+// });
 function AuthUser(userID, verificationCode, callback){
 
         // TODO add separate transitioning table to avoid users seasrchin or sending messages to accounts that havent been verified yet
@@ -253,7 +254,7 @@ function sendMessage(text, message_id, chat_id, has_attachments, type, sender, t
 
 }
 function selectAll(from,column,target,callback) {
-    var sql = "SELECT * FROM "+ from+" WHERE "+column+" = '"+target+"'";
+    var sql = "SELECT * FROM "+ from+" WHERE "+column+" = '"+target+"'LIMIT 10";
     connection.query(sql,function (err,result) {
         if(err){
             return callback({success:false,data:err})
